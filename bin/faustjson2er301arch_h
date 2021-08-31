@@ -1,0 +1,90 @@
+#! /bin/env python3
+
+import fileinput
+import json
+
+raw = ''.join([line for line in fileinput.input()])
+data = json.loads(raw)
+
+name = data['name']
+inputs = [meta['er301_input'] for meta in data['meta'] if 'er301_input' in meta]
+outputs = [meta['er301_output'] for meta in data['meta'] if 'er301_output' in meta]
+
+if len(inputs) != data['inputs']:
+    print(f'Faust `process` function has {data["inputs"]} input channels but {len(inputs)} delcared')
+    exit(1)
+if len(outputs) != data['outputs']:
+    print(f'Faust `process` function has {data["outputs"]} outputs channels but {len(outputs)} delcared')
+    exit(1)
+
+input_defns = '\n\t'.join([f'od::Inlet m{input_name}{{"{input_name}"}};' for input_name in inputs])
+output_defns = '\n\t'.join([f'od::Outlet m{output_name}{{"{output_name}"}};' for output_name in outputs])
+
+print(f"""<<includeIntrinsic>>
+
+#include <od/objects/Object.h>
+
+#define FAUSTFLOAT float
+
+#ifndef SWIGLUA
+class dsp {{}};
+
+struct Meta {{
+  virtual void declare(const char* key, const char* value) {{}};
+}};
+
+struct Soundfile {{
+  FAUSTFLOAT** fBuffers;
+  int* fLength;   // length of each part
+  int* fSR;       // sample rate of each part
+  int* fOffset;   // offset of each part in the global buffer
+  int fChannels;  // max number of channels of all concatenated files
+}};
+
+struct UI {{
+  // -- widget's layouts
+  virtual void openTabBox(const char* label) {{}}
+  virtual void openHorizontalBox(const char* label) {{}}
+  virtual void openVerticalBox(const char* label) {{}}
+  virtual void closeBox() {{}}
+
+  // -- active widgets
+  virtual void addButton(const char* label, FAUSTFLOAT* zone) {{}}
+  virtual void addCheckButton(const char* label, FAUSTFLOAT* zone) {{}}
+  virtual void addVerticalSlider(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{}}
+  virtual void addHorizontalSlider(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{}}
+  virtual void addNumEntry(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{}}
+
+  // -- passive widgets
+  virtual void addHorizontalBargraph(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT min, FAUSTFLOAT max) {{}}
+  virtual void addVerticalBargraph(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT min, FAUSTFLOAT max) {{}}
+
+  // -- soundfiles
+  virtual void addSoundfile(const char* label, const char* filename, Soundfile** sf_zone) {{}}
+
+  // -- metadata declarations
+  virtual void declare(FAUSTFLOAT* zone, const char* key, const char* val) {{}}
+}};
+
+<<includeclass>>
+#endif
+
+class {name} : public od::Object
+{{
+  public:
+    {name}();
+    ~{name}();
+
+#ifndef SWIGLUA
+    virtual void process();
+    {input_defns}
+    {output_defns}
+
+  private:
+    mydsp DSP;
+
+#endif
+
+}};
+"""
+)

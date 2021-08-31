@@ -1,0 +1,46 @@
+#! /bin/env bash
+set -e
+
+for p in "$@";
+do
+
+	if [ "$p" = "--help" ] || [ "$p" = "-help" ] || [ "$p" = "-h" ]; then
+        echo "faust2er301 <file1.dsp> [<file2.dsp> [<file3.dsp> .. ]]"
+        echo "Outputs .cpp and .h for er-301 objects"
+        exit
+	elif [[ -f "$p" ]]; then
+	    FILES="$FILES $p"
+	else
+        echo "faust2er301 <file1.dsp> [<file2.dsp> [<file3.dsp> .. ]]"
+        echo "Outputs .cpp and .h for er-301 objects"
+        echo ""
+        echo "Unexpected option '$p'"
+        exit
+    fi
+done
+
+for p in $FILES; do
+    f=$(basename "$p")
+    SRCDIR=$(dirname "$p")
+
+    # creates a temporary dir 
+    TDR=$(mktemp --tmpdir -d faust.XXXXXX)
+    TMP=$TDR/${f%.dsp}
+    mkdir "$TMP"
+
+    # Make a json datafile
+    faust -json "$SRCDIR/$f" -o /dev/null || exit
+    mv "$SRCDIR/$f.json" "$TMP/"
+
+    # Create cpp file
+	CXX_SOURCE="$SRCDIR/${f%.dsp}.cpp"
+	faustjson2er301cpp <"$TMP/$f.json" > "$CXX_SOURCE"
+
+	# Create architecture.h file
+	ARCHFILE="$TMP/${f%.dsp}.h"
+	faustjson2er301arch_h <"$TMP/$f.json" > "$ARCHFILE"
+
+	# Create the header file
+	H="$SRCDIR/${f%.dsp}.h"
+    faust -vec -vs 4 -a "$ARCHFILE" "$SRCDIR/$f" -o "$H" || exit
+done;

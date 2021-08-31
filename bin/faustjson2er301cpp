@@ -1,0 +1,42 @@
+#! /bin/env python3
+
+import fileinput
+import json
+
+raw = ''.join([line for line in fileinput.input()])
+data = json.loads(raw)
+
+name = data['name']
+inputs = [meta['er301_input'] for meta in data['meta'] if 'er301_input' in meta]
+outputs = [meta['er301_output'] for meta in data['meta'] if 'er301_output' in meta]
+
+if len(inputs) != data['inputs']:
+    print(f'Faust `process` function has {data["inputs"]} input channels but {len(inputs)} delcared')
+    exit(1)
+if len(outputs) != data['outputs']:
+    print(f'Faust `process` function has {data["outputs"]} outputs channels but {len(outputs)} delcared')
+    exit(1)
+
+constructor_inputs = '\n\t'.join([f'addInput(m{input_name});' for input_name in inputs])
+constructor_outputs = '\n\t'.join([f'addOutput(m{output_name});' for output_name in outputs])
+
+input_buffers = ', '.join([f'm{input_name}.buffer()' for input_name in inputs])
+output_buffers = ', '.join([f'm{output_name}.buffer()' for output_name in outputs])
+
+print(f"""#include "{name}.h"
+#include <od/config.h>
+{name}::{name}() : DSP()
+{{
+    {constructor_inputs}
+    {constructor_outputs}
+}}
+{name}::~{name}()
+{{ }}
+void {name}::process()
+{{
+    FAUSTFLOAT* inputs[] = {{ {input_buffers} }};
+    FAUSTFLOAT* outputs[] = {{ {output_buffers} }};
+    DSP.compute(FRAMELENGTH, inputs, outputs);
+}}
+"""
+)
