@@ -2,41 +2,63 @@
 
 import fileinput
 import json
+import sys
 
 raw = ''.join([line for line in fileinput.input()])
 data = json.loads(raw)
 
 name = data['name']
-inputs = [meta['er301_input'] for meta in data['meta'] if 'er301_input' in meta]
-outputs = [meta['er301_output'] for meta in data['meta'] if 'er301_output' in meta]
+filename = data['filename']
+input_count = data['inputs']
+output_count = data['outputs']
+meta = {k: v for m in data['meta'] for k, v in m.items()}
 
-if len(inputs) != data['inputs']:
-    print(f'Faust `process` function has {data["inputs"]} input channels but {len(inputs)} delcared')
-    exit(1)
-if len(outputs) != data['outputs']:
-    print(f'Faust `process` function has {data["outputs"]} outputs channels but {len(outputs)} delcared')
-    exit(1)
+try:
+    inputs = [meta[f'er301_in{n}'] for n in range(1, input_count+1)]
+    outputs = [meta[f'er301_out{n}'] for n in range(1, output_count+1)]
+except KeyError as e:
+    print('\n\nMissing process function in/out name declaration needed for er-301 object\n\n', file=sys.stderr)
+    raise e
 
-constructor_inputs = '\n\t'.join([f'addInput(m{input_name});' for input_name in inputs])
-constructor_outputs = '\n\t'.join([f'addOutput(m{output_name});' for output_name in outputs])
+constructor_inputs = '\n  '.join([f'addInput(m{input_name});' for input_name in inputs])
+constructor_outputs = '\n  '.join([f'addOutput(m{output_name});' for output_name in outputs])
 
 input_buffers = ', '.join([f'm{input_name}.buffer()' for input_name in inputs])
 output_buffers = ', '.join([f'm{output_name}.buffer()' for output_name in outputs])
 
+
+# Get all the ui elements (to become paramters)
+def iterate_items(items):
+    sliders = []
+    for item in items:
+        if item['type'] == 'hslider' or item['type'] == 'vslider':
+            sliders.append((item['label'], item['min'], item['max']))
+        if item['type'] == 'vgroup' or item['type'] == 'hgroup':
+            sliders.extend(iterate_items(item['items']))
+    return sliders
+
+params = iterate_items(data['ui']) if 'ui' in data else []
+constructor_params = '\n  '.join([f'addParameter(m{param_name});' for (param_name, _, _) in params])
+set_params = '\n  '.join([f'*(uiParams.ff{param_name}) = CLAMP(m{param_name}.target(), {min_val}, {max_val});' for (param_name, min_val, max_val) in params])
+
 print(f"""#include "{name}.h"
 #include <od/config.h>
-{name}::{name}() : DSP()
+#include <hal/ops.h>
+{name}::{name}() : DSP(), uiParams()
 {{
-    {constructor_inputs}
-    {constructor_outputs}
+  {constructor_inputs}
+  {constructor_outputs}
+  {constructor_params}
+  DSP.buildUserInterface(&uiParams);
 }}
 {name}::~{name}()
 {{ }}
 void {name}::process()
 {{
-    FAUSTFLOAT* inputs[] = {{ {input_buffers} }};
-    FAUSTFLOAT* outputs[] = {{ {output_buffers} }};
-    DSP.compute(FRAMELENGTH, inputs, outputs);
+  FAUSTFLOAT* inputs[] = {{ {input_buffers} }};
+  FAUSTFLOAT* outputs[] = {{ {output_buffers} }};
+  {set_params}
+  DSP.compute(FRAMELENGTH, inputs, outputs);
 }}
 """
 )
