@@ -39,13 +39,15 @@ def iterate_items(items):
 
 params = iterate_items(data['ui']) if 'ui' in data else []
 constructor_params = '\n  '.join([f'addParameter(m{param_name});' for (param_name, _, _) in params])
-set_params = '\n  '.join([f'*(uiParams.ff{param_name}) = CLAMP(m{param_name}.target(), {min_val}, {max_val});' for (param_name, min_val, max_val) in params])
+set_params = '\n  '.join([f'*ff{param_name} = CLAMP(m{param_name}.target(), {min_val}, {max_val});' for (param_name, min_val, max_val) in params])
 
 print(f"""#include "{name}.h"
 #include <od/config.h>
 #include <hal/ops.h>
-{name}::{name}() : DSP(), uiParams()
+{name}::{name}() : DSP()
 {{
+  UI uiParams(this);
+
   {constructor_inputs}
   {constructor_outputs}
   {constructor_params}

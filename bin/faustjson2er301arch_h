@@ -50,7 +50,16 @@ print(f"""<<includeIntrinsic>>
 #define FAUSTFLOAT float
 
 #ifndef SWIGLUA
+
+#ifndef __FAUST_301_BOILERPLATE__
+#define __FAUST_301_BOILERPLATE__
+
 class dsp {{}};
+
+class ParametersSetter {{
+public:
+  virtual void addParam(const char* label, FAUSTFLOAT* zone) = 0;
+}};
 
 struct Meta {{
   virtual void declare(const char* key, const char* value) {{}};
@@ -66,7 +75,10 @@ struct Soundfile {{
 
 class UI {{
 public:
-  {param_floats}
+  UI(ParametersSetter *_ps) {{
+    ps = _ps;
+  }}
+
   // -- widget's layouts
   virtual void openTabBox(const char* label) {{}}
   virtual void openHorizontalBox(const char* label) {{}}
@@ -75,19 +87,19 @@ public:
 
   // -- active widgets
   virtual void addButton(const char* label, FAUSTFLOAT* zone) {{
-    {param_set}
+    ps->addParam(label, zone);
   }}
   virtual void addCheckButton(const char* label, FAUSTFLOAT* zone) {{
-    {param_set}
+    ps->addParam(label, zone);
   }}
   virtual void addVerticalSlider(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{
-    {param_set}
+    ps->addParam(label, zone);
   }}
   virtual void addHorizontalSlider(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{
-    {param_set}
+    ps->addParam(label, zone);
   }}
   virtual void addNumEntry(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT init, FAUSTFLOAT min, FAUSTFLOAT max, FAUSTFLOAT step) {{
-    {param_set}
+    ps->addParam(label, zone);
   }}
 
   // -- passive widgets
@@ -99,12 +111,20 @@ public:
 
   // -- metadata declarations
   virtual void declare(FAUSTFLOAT* zone, const char* key, const char* val) {{}}
+
+private:
+  ParametersSetter *ps;
 }};
+#endif
 
 <<includeclass>>
 #endif
 
-class {name} : public od::Object
+class {name} :
+    public od::Object
+#ifndef SWIGLUA
+    , public ParametersSetter
+#endif
 {{
 public:
   {name}();
@@ -115,10 +135,13 @@ public:
   {input_defns}
   {output_defns}
   {param_defn}
+  virtual void addParam(const char* label, FAUSTFLOAT* zone) {{
+    {param_set}
+  }}
 
 private:
-  mydsp DSP;
-  UI uiParams;
+  {param_floats}
+  Dsp{name} DSP;
 
 #endif
 
