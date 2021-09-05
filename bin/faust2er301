@@ -42,5 +42,6 @@ for p in $FILES; do
 
 	# Create the header file
 	H="$SRCDIR/${f%.dsp}.h"
-    faust -vec -vs 4 -a "$ARCHFILE" "$SRCDIR/$f" -o "$H" || exit
+    # faust -vec -vs 4 -a "$ARCHFILE" "$SRCDIR/$f" -o "$H" || exit
+    faust -a "$ARCHFILE" "$SRCDIR/$f" -o "$H" || exit
 done;

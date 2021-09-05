@@ -49,6 +49,7 @@ print(f"""#include "{name}.h"
   {constructor_inputs}
   {constructor_outputs}
   {constructor_params}
+  DSP.init(globalConfig.sampleRate);
   DSP.buildUserInterface(&uiParams);
 }}
 {name}::~{name}()
