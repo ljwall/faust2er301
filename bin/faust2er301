@@ -1,4 +1,4 @@
-#! /bin/env bash
+#! /usr/bin/env bash
 set -e
 
 for p in "$@";
@@ -24,7 +24,7 @@ for p in $FILES; do
     SRCDIR=$(dirname "$p")
 
     # creates a temporary dir 
-    TDR=$(mktemp --tmpdir -d faust.XXXXXX)
+    TDR=$(mktemp -dt faust2er301.XXXXXX)
     TMP=$TDR/${f%.dsp}
     mkdir "$TMP"
 
